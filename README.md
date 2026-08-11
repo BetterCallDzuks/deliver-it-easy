@@ -15,8 +15,9 @@ remembering past addresses and routes locally so they never re-enter them.
 | 1 | **Smart Address Input** — searches the local SQLite address book first (⚡ instant), only falling back to the external API on a miss, and auto-saves new picks | `components/AddressAutocompleteInput.tsx`, `services/locationService.ts` |
 | 2 | **Route Planner + Interactive Map** — start from the driver's **current location** (device GPS), numbered markers, polyline, auto-fit, drag-and-drop reordering | `screens/RoutePlannerScreen.tsx`, `components/RouteMap.tsx`, `services/deviceLocationService.ts` |
 | 3 | **Route Optimization** — one-tap "Optimize" (mock: nearest-neighbour TSP) | `services/routingService.ts` |
-| 4 | **Active Delivery Mode** — big in-vehicle buttons, external navigation (Google/Waze/Apple Maps), Mark-as-Delivered | `screens/ActiveDeliveryScreen.tsx`, `services/navigationService.ts` |
+| 4 | **Active Delivery Mode** — big in-vehicle buttons, external navigation (Google/Waze/Apple Maps), **live position tracking**, **proof of delivery** (photo + signature + recipient + notes) | `screens/ActiveDeliveryScreen.tsx`, `services/navigationService.ts`, `components/ProofOfDeliveryModal.tsx` |
 | 5 | **Address Book + Route Templates** — view/edit saved locations, save & reload routes like "Tuesday Center Route" | `screens/AddressBookScreen.tsx`, `screens/TemplatesScreen.tsx` |
+| 6 | **Delivery History** — persisted proof-of-delivery log (photo, signature, recipient, notes, timestamp) | `screens/DeliveryHistoryScreen.tsx`, `db/deliveryRepository.ts` |
 
 ## Getting started
 
@@ -27,6 +28,28 @@ npm start          # then press i (iOS), a (Android), or scan the QR in Expo Go
 
 > Native Google Maps needs a Dev Build (or Expo Go) — `react-native-maps`
 > renders via Apple Maps on iOS by default and Google Maps on Android.
+
+## Development & CI
+
+```bash
+npm run typecheck   # tsc --noEmit
+npm run lint        # eslint (expo config)
+```
+
+Both run automatically on every pull request and on pushes to `main` via
+GitHub Actions (`.github/workflows/ci.yml`).
+
+**Live tracking & proof of delivery**
+- Active Delivery watches the driver's position (`expo-location`
+  `watchPositionAsync`) and re-anchors the route origin once they've moved
+  ≥ 75 m, so the ETA stays honest without hammering the routing API. In mock
+  mode the position gently drifts so the live marker visibly moves in a
+  simulator.
+- Marking a stop delivered opens a proof-of-delivery sheet: camera photo
+  (`expo-image-picker`, copied into the document dir for durability), a native
+  signature pad (`react-native-svg` + PanResponder — no webview), recipient and
+  notes. Records persist in SQLite (`delivery_proofs`) and show in the History
+  tab. All fields are optional so completing a delivery is never blocked.
 
 ## Architecture
 

@@ -6,9 +6,10 @@ export type PlannerStackParamList = {
   ActiveDelivery: undefined;
 };
 
-/** The three bottom tabs. */
+/** The bottom tabs. */
 export type RootTabParamList = {
   PlanTab: NavigatorScreenParams<PlannerStackParamList>;
   AddressBookTab: undefined;
   TemplatesTab: undefined;
+  HistoryTab: undefined;
 };

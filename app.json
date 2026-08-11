@@ -44,7 +44,14 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Deliver It Easy uses your location to set your delivery route's starting point."
+          "locationWhenInUsePermission": "Deliver It Easy uses your location to set your route's starting point and track your position live during deliveries."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Deliver It Easy uses your camera to capture proof-of-delivery photos.",
+          "photosPermission": "Deliver It Easy accesses your photos to attach proof of delivery."
         }
       ]
     ],
