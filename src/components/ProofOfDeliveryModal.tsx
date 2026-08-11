@@ -25,10 +25,9 @@ import { SignaturePad } from './SignaturePad';
 /**
  * Proof-of-delivery capture sheet shown when marking a stop delivered.
  *
- * Optionally captures a photo, a recipient name, free-text notes and a
- * signature. Everything is optional — a driver can just confirm — so it never
- * blocks completing a delivery. The parent persists the returned proof and then
- * advances the route.
+ * A delivery photo is REQUIRED — the driver can't confirm without one. The
+ * recipient name, notes and signature remain optional. The parent persists the
+ * returned proof and then advances the route.
  */
 
 export interface DeliveryProofDraft {
@@ -87,6 +86,8 @@ export function ProofOfDeliveryModal({ visible, stop, onCancel, onConfirm }: Pro
   }, [photoUri]);
 
   const handleConfirm = useCallback(() => {
+    // A photo is mandatory — guard even though the button is disabled without one.
+    if (!photoUri) return;
     onConfirm({
       recipientName: recipientName.trim() || null,
       notes: notes.trim() || null,
@@ -126,8 +127,11 @@ export function ProofOfDeliveryModal({ visible, stop, onCancel, onConfirm }: Pro
             contentContainerStyle={styles.content}
             keyboardShouldPersistTaps="handled"
           >
-            {/* Photo */}
-            <Text style={styles.sectionLabel}>PHOTO</Text>
+            {/* Photo — required */}
+            <View style={styles.labelRow}>
+              <Text style={styles.sectionLabel}>PHOTO</Text>
+              <Text style={styles.requiredTag}>REQUIRED</Text>
+            </View>
             {photoUri ? (
               <View style={styles.photoWrap}>
                 <Image source={{ uri: photoUri }} style={styles.photo} />
@@ -173,11 +177,17 @@ export function ProofOfDeliveryModal({ visible, stop, onCancel, onConfirm }: Pro
           </ScrollView>
 
           <View style={styles.footer}>
+            {!photoUri && (
+              <Text style={styles.footerHint}>
+                Take a delivery photo to confirm.
+              </Text>
+            )}
             <PrimaryButton
               title="Confirm Delivery"
               icon="checkmark-circle"
               variant="success"
               large
+              disabled={!photoUri}
               onPress={handleConfirm}
             />
           </View>
@@ -232,6 +242,24 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     letterSpacing: 1,
     marginTop: spacing.md,
+  },
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  requiredTag: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: colors.danger,
+    letterSpacing: 0.5,
+    marginTop: spacing.md,
+  },
+  footerHint: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
   },
   input: {
     backgroundColor: colors.surface,

@@ -49,7 +49,8 @@ GitHub Actions (`.github/workflows/ci.yml`).
   (`expo-image-picker`, copied into the document dir for durability), a native
   signature pad (`react-native-svg` + PanResponder — no webview), recipient and
   notes. Records persist in SQLite (`delivery_proofs`) and show in the History
-  tab. All fields are optional so completing a delivery is never blocked.
+  tab. **A photo is required to confirm** a delivery; recipient, notes and
+  signature are optional.
 
 ## Architecture
 
