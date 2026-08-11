@@ -63,6 +63,22 @@ Profiles:
 > iOS can't be sideloaded — it requires a paid Apple Developer account and goes
 > through TestFlight. Android `preview` needs neither.
 
+### Automated release builds (CI)
+
+`.github/workflows/eas-build.yml` kicks off an EAS build automatically:
+
+- **Push a version tag** — `git tag v1.0.0 && git push origin v1.0.0` → production
+  Android build.
+- **Manual** — the *EAS Build* workflow in the Actions tab lets you pick the
+  platform (android / ios / all) and profile (preview / production).
+
+**One-time setup:** add an `EXPO_TOKEN` repository secret so CI can build under
+your Expo account —
+create a token at <https://expo.dev/settings/access-tokens>, then add it under
+repo **Settings → Secrets and variables → Actions**. The workflow fails fast
+with a clear message if it's missing. Builds run on EAS servers (`--no-wait`);
+watch progress and grab the install link on <https://expo.dev>.
+
 ## Development & CI
 
 ```bash
