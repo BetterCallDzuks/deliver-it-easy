@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 import DraggableFlatList, {
   type RenderItemParams,
@@ -39,14 +39,24 @@ export function RoutePlannerScreen({ navigation }: Props) {
     stops,
     route,
     isBusy,
+    routeError,
     addStopFromSuggestion,
     removeStop,
     reorderStops,
     optimize,
     clearRoute,
+    clearRouteError,
   } = useRoute();
 
   const [saveVisible, setSaveVisible] = useState(false);
+
+  // Surface any live API error (Places/Directions) once, then clear it.
+  useEffect(() => {
+    if (!routeError) return;
+    Alert.alert('Something went wrong', routeError, [
+      { text: 'OK', onPress: clearRouteError },
+    ]);
+  }, [routeError, clearRouteError]);
 
   const handleStartDelivery = useCallback(() => {
     if (stops.length === 0) return;

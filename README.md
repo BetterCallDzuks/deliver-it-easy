@@ -53,15 +53,32 @@ src/
 `src/services`. Screens and components never call an external API directly —
 they call a service, which internally branches on `CONFIG.MOCK_MODE`.
 
-## Going live (Phase 2)
+## Going live (Phase 2 — implemented ✅)
 
-1. Set `mockMode: false` in `app.json` → `expo.extra`, and add your keys to
-   `googlePlacesApiKey` / `googleDirectionsApiKey` there (plus the native
-   `googleMapsApiKey` fields for the map SDK).
-2. Fill in the clearly-marked real branches:
-   - `remoteSearch()` in `services/locationService.ts` → Google Places
-     Autocomplete + Place Details.
-   - `buildRoute()` / `optimizeRoute()` in `services/routingService.ts` →
-     Google Directions API (use `optimize:true` waypoints for real TSP).
+The real Google API calls are now wired in behind `CONFIG.MOCK_MODE`. To switch
+from mock data to live:
 
-No screen, component, DB or model code needs to change.
+1. **Enable these APIs** in your Google Cloud project:
+   - **Places API (New)** — address autocomplete + place details
+   - **Directions API** — routing, ETAs, and `optimize:true` waypoint ordering
+   - **Maps SDK for Android** / **Maps SDK for iOS** — the interactive map itself
+2. **Add your keys** in `app.json`:
+   - `expo.extra.googlePlacesApiKey` and `expo.extra.googleDirectionsApiKey`
+     (used by the services; can be the same key)
+   - `ios.config.googleMapsApiKey` and `android.config.googleMaps.apiKey`
+     (used natively by `react-native-maps`)
+3. **Flip the switch:** set `expo.extra.mockMode` to `false`.
+
+That's it — no screen, component, DB or model code changes. What each live
+branch does:
+
+| Service | Live behavior |
+|---------|---------------|
+| `locationService.remoteSearch()` | Places (New) **Autocomplete** (POST `places:autocomplete`), grouped under a billing **session token** |
+| `locationService.resolveSuggestion()` | Places (New) **Details** (`places/{id}`, field-masked) to fetch lat/lng at selection, closing the session |
+| `routingService.buildRoute()` | **Directions API** — decodes the real `overview_polyline`, uses per-leg distance/duration |
+| `routingService.optimizeRoute()` | **Directions API** with `optimize:true` waypoints; applies Google's `waypoint_order` (start stop kept fixed) |
+
+Live API failures (no key, network, quota) surface a friendly alert and fall
+back to a straight-line route so the map never goes blank — see
+`RouteContext` error handling.

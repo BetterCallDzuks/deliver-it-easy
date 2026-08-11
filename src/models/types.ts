@@ -78,6 +78,14 @@ export interface AddressSuggestion {
   latitude: number;
   longitude: number;
   source: 'local' | 'remote';
+  /**
+   * Google Place id for remote hits. Autocomplete predictions don't include
+   * coordinates, so a remote suggestion carries its placeId and `latitude` /
+   * `longitude` stay 0 until resolved via a Place Details lookup at selection
+   * time (see locationService.resolveSuggestion). Null for local hits, which
+   * already have real coordinates.
+   */
+  placeId?: string | null;
 }
 
 /**

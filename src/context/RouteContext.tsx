@@ -32,6 +32,8 @@ interface RouteContextValue {
   stops: Stop[];
   route: RouteResult | null;
   isBusy: boolean;
+  /** Last user-facing error from a live API call (null when all is well). */
+  routeError: string | null;
 
   addStopFromSuggestion: (s: AddressSuggestion) => Promise<void>;
   addStopFromAddress: (a: Address) => Promise<void>;
@@ -42,8 +44,23 @@ interface RouteContextValue {
   optimize: () => Promise<void>;
   markDelivered: (stopId: string) => void;
   loadTemplate: (template: RouteTemplate) => void;
+  clearRouteError: () => void;
 
   pendingStops: Stop[];
+}
+
+const errorMessage = (err: unknown): string =>
+  err instanceof Error ? err.message : 'Something went wrong. Please try again.';
+
+/** Straight-line fallback so the map still renders if a live route call fails. */
+function straightLineResult(stops: Stop[]): RouteResult {
+  return {
+    stops,
+    polyline: stops.map((s) => ({ latitude: s.latitude, longitude: s.longitude })),
+    legs: [],
+    totalDistanceMeters: 0,
+    totalDurationSeconds: 0,
+  };
 }
 
 const RouteContext = createContext<RouteContextValue | undefined>(undefined);
@@ -52,6 +69,9 @@ export function RouteProvider({ children }: { children: React.ReactNode }) {
   const [stops, setStops] = useState<Stop[]>([]);
   const [route, setRoute] = useState<RouteResult | null>(null);
   const [isBusy, setIsBusy] = useState(false);
+  const [routeError, setRouteError] = useState<string | null>(null);
+
+  const clearRouteError = useCallback(() => setRouteError(null), []);
 
   /** Recompute the drawable route (polyline + ETAs) whenever order changes. */
   const refreshRoute = useCallback(async (nextStops: Stop[]) => {
@@ -59,10 +79,17 @@ export function RouteProvider({ children }: { children: React.ReactNode }) {
       setRoute(null);
       return;
     }
-    const result = await buildRoute(nextStops);
-    // buildRoute re-sequences; keep our stop list numbering aligned with it.
-    setStops(result.stops);
-    setRoute(result);
+    try {
+      const result = await buildRoute(nextStops);
+      // buildRoute re-sequences; keep our stop list numbering aligned with it.
+      setStops(result.stops);
+      setRoute(result);
+    } catch (err) {
+      // A live Directions failure shouldn't blank the map or drop the stops —
+      // fall back to a straight-line route and surface the error.
+      setRoute(straightLineResult(nextStops));
+      setRouteError(errorMessage(err));
+    }
   }, []);
 
   const appendStop = useCallback(
@@ -76,10 +103,15 @@ export function RouteProvider({ children }: { children: React.ReactNode }) {
 
   const addStopFromSuggestion = useCallback(
     async (suggestion: AddressSuggestion) => {
-      // Selecting a suggestion always persists it to the address book (new
-      // remote hits get saved; existing local hits get a usage bump).
-      const saved = await saveSuggestionToAddressBook(suggestion);
-      await appendStop(suggestionStop(saved));
+      try {
+        // Selecting a suggestion resolves its coordinates (Place Details for
+        // remote hits) and persists it to the address book (new remote hits
+        // get saved; existing local hits get a usage bump).
+        const saved = await saveSuggestionToAddressBook(suggestion);
+        await appendStop(suggestionStop(saved));
+      } catch (err) {
+        setRouteError(errorMessage(err));
+      }
     },
     [appendStop],
   );
@@ -126,6 +158,9 @@ export function RouteProvider({ children }: { children: React.ReactNode }) {
       const result = await optimizeRoute(stops);
       setStops(result.stops);
       setRoute(result);
+    } catch (err) {
+      // Keep the current order on failure; just tell the driver why.
+      setRouteError(errorMessage(err));
     } finally {
       setIsBusy(false);
     }
@@ -174,6 +209,7 @@ export function RouteProvider({ children }: { children: React.ReactNode }) {
       stops,
       route,
       isBusy,
+      routeError,
       addStopFromSuggestion,
       addStopFromAddress,
       removeStop,
@@ -182,12 +218,14 @@ export function RouteProvider({ children }: { children: React.ReactNode }) {
       optimize,
       markDelivered,
       loadTemplate,
+      clearRouteError,
       pendingStops,
     }),
     [
       stops,
       route,
       isBusy,
+      routeError,
       addStopFromSuggestion,
       addStopFromAddress,
       removeStop,
@@ -196,6 +234,7 @@ export function RouteProvider({ children }: { children: React.ReactNode }) {
       optimize,
       markDelivered,
       loadTemplate,
+      clearRouteError,
       pendingStops,
     ],
   );
