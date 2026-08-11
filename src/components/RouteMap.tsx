@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useRef } from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 import MapView, {
@@ -28,6 +29,8 @@ interface Props {
   polyline?: Coordinate[];
   /** Highlight one stop (e.g. the current destination in delivery mode). */
   activeStopId?: string;
+  /** The driver's start location, shown as a distinct marker if set. */
+  origin?: Coordinate | null;
 }
 
 // Central Manchester — matches the mock data so an empty map isn't in the ocean.
@@ -38,7 +41,7 @@ const DEFAULT_REGION: Region = {
   longitudeDelta: 0.08,
 };
 
-export function RouteMap({ stops, polyline, activeStopId }: Props) {
+export function RouteMap({ stops, polyline, activeStopId, origin }: Props) {
   const mapRef = useRef<MapView>(null);
 
   const lineCoords: Coordinate[] =
@@ -47,12 +50,12 @@ export function RouteMap({ stops, polyline, activeStopId }: Props) {
       : stops.map((s) => ({ latitude: s.latitude, longitude: s.longitude }));
 
   useEffect(() => {
-    if (stops.length === 0 || !mapRef.current) return;
-
-    const coords = stops.map((s) => ({
-      latitude: s.latitude,
-      longitude: s.longitude,
-    }));
+    // Fit to every marker, including the driver's start location if set.
+    const coords: Coordinate[] = [
+      ...(origin ? [origin] : []),
+      ...stops.map((s) => ({ latitude: s.latitude, longitude: s.longitude })),
+    ];
+    if (coords.length === 0 || !mapRef.current) return;
 
     // Give the map a tick to lay out before fitting.
     const timer = setTimeout(() => {
@@ -63,7 +66,7 @@ export function RouteMap({ stops, polyline, activeStopId }: Props) {
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [stops]);
+  }, [stops, origin]);
 
   return (
     <View style={styles.container}>
@@ -84,6 +87,20 @@ export function RouteMap({ stops, polyline, activeStopId }: Props) {
           />
         )}
 
+        {origin && (
+          <Marker
+            coordinate={origin}
+            title="Start"
+            description="Your current location"
+            anchor={{ x: 0.5, y: 0.5 }}
+            tracksViewChanges={false}
+          >
+            <View style={styles.startMarker}>
+              <Ionicons name="navigate" size={16} color={colors.markerText} />
+            </View>
+          </Marker>
+        )}
+
         {stops.map((stop) => (
           <Marker
             key={stop.id}
@@ -100,7 +117,7 @@ export function RouteMap({ stops, polyline, activeStopId }: Props) {
         ))}
       </MapView>
 
-      {stops.length === 0 && (
+      {stops.length === 0 && !origin && (
         <View pointerEvents="none" style={styles.emptyOverlay}>
           <Text style={styles.emptyText}>Add stops to see them on the map</Text>
         </View>
@@ -143,6 +160,21 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
+  },
+  startMarker: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: colors.success,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.markerText,
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 4,
   },
   markerLabel: {
     color: colors.markerText,

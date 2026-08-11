@@ -15,6 +15,7 @@ import { NamePromptModal } from '@/components/NamePromptModal';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { RouteMap } from '@/components/RouteMap';
 import { RouteSummaryBar } from '@/components/RouteSummaryBar';
+import { StartLocationBar } from '@/components/StartLocationBar';
 import { StopListItem } from '@/components/StopListItem';
 import { useRoute } from '@/context/RouteContext';
 import { saveTemplate } from '@/db/templateRepository';
@@ -40,12 +41,16 @@ export function RoutePlannerScreen({ navigation }: Props) {
     route,
     isBusy,
     routeError,
+    origin,
+    isLocating,
     addStopFromSuggestion,
     removeStop,
     reorderStops,
     optimize,
     clearRoute,
     clearRouteError,
+    setStartToCurrentLocation,
+    clearOrigin,
   } = useRoute();
 
   const [saveVisible, setSaveVisible] = useState(false);
@@ -94,11 +99,20 @@ export function RoutePlannerScreen({ navigation }: Props) {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Map — top half */}
       <View style={styles.mapSection}>
-        <RouteMap stops={stops} polyline={route?.polyline} />
+        <RouteMap stops={stops} polyline={route?.polyline} origin={origin} />
       </View>
 
       {/* Controls + list — bottom half */}
       <View style={styles.bottomSection}>
+        <View style={styles.startWrap}>
+          <StartLocationBar
+            origin={origin}
+            isLocating={isLocating}
+            onUseCurrentLocation={setStartToCurrentLocation}
+            onClear={clearOrigin}
+          />
+        </View>
+
         <AddressAutocompleteInput onSelect={addStopFromSuggestion} />
 
         <View style={styles.summaryWrap}>
@@ -112,7 +126,7 @@ export function RoutePlannerScreen({ navigation }: Props) {
             variant="accent"
             onPress={optimize}
             loading={isBusy}
-            disabled={stops.length < 3}
+            disabled={stops.length + (origin ? 1 : 0) < 3}
             style={styles.flexButton}
           />
           <PrimaryButton
@@ -193,6 +207,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
     paddingBottom: spacing.md,
+  },
+  startWrap: {
+    marginBottom: spacing.md,
   },
   summaryWrap: {
     marginTop: spacing.md,

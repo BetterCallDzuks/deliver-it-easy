@@ -13,7 +13,7 @@ remembering past addresses and routes locally so they never re-enter them.
 | # | Feature | Where |
 |---|---------|-------|
 | 1 | **Smart Address Input** — searches the local SQLite address book first (⚡ instant), only falling back to the external API on a miss, and auto-saves new picks | `components/AddressAutocompleteInput.tsx`, `services/locationService.ts` |
-| 2 | **Route Planner + Interactive Map** — numbered markers, polyline, auto-fit, drag-and-drop reordering | `screens/RoutePlannerScreen.tsx`, `components/RouteMap.tsx` |
+| 2 | **Route Planner + Interactive Map** — start from the driver's **current location** (device GPS), numbered markers, polyline, auto-fit, drag-and-drop reordering | `screens/RoutePlannerScreen.tsx`, `components/RouteMap.tsx`, `services/deviceLocationService.ts` |
 | 3 | **Route Optimization** — one-tap "Optimize" (mock: nearest-neighbour TSP) | `services/routingService.ts` |
 | 4 | **Active Delivery Mode** — big in-vehicle buttons, external navigation (Google/Waze/Apple Maps), Mark-as-Delivered | `screens/ActiveDeliveryScreen.tsx`, `services/navigationService.ts` |
 | 5 | **Address Book + Route Templates** — view/edit saved locations, save & reload routes like "Tuesday Center Route" | `screens/AddressBookScreen.tsx`, `screens/TemplatesScreen.tsx` |
@@ -82,3 +82,13 @@ branch does:
 Live API failures (no key, network, quota) surface a friendly alert and fall
 back to a straight-line route so the map never goes blank — see
 `RouteContext` error handling.
+
+### Route start location
+
+Tapping **"Start from my location"** sets the route's fixed origin to the
+driver's device GPS position (`expo-location`, foreground permission). The
+origin is injected as the first point when the route is built and is **pinned
+by optimization** (only the delivery stops between it and the last stop are
+reordered), then stripped back out of the delivery list. In **mock mode** the
+location resolves to a fixed central-Manchester point so the flow works in any
+simulator without a permission prompt.
