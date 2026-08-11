@@ -14,6 +14,17 @@ export interface Coordinate {
 }
 
 /**
+ * The driver's starting point for a route (their current device location).
+ *
+ * Held separately from the delivery `Stop`s: it's the fixed origin the route
+ * begins from and that route optimization pins in place — it is never a
+ * delivery and never gets a sequence number or a "Mark as Delivered" action.
+ */
+export interface DriverLocation extends Coordinate {
+  label: string;
+}
+
+/**
  * A saved location in the driver's local "address book".
  *
  * Every address the driver ever selects (from local search or the external API)
@@ -78,6 +89,14 @@ export interface AddressSuggestion {
   latitude: number;
   longitude: number;
   source: 'local' | 'remote';
+  /**
+   * Google Place id for remote hits. Autocomplete predictions don't include
+   * coordinates, so a remote suggestion carries its placeId and `latitude` /
+   * `longitude` stay 0 until resolved via a Place Details lookup at selection
+   * time (see locationService.resolveSuggestion). Null for local hits, which
+   * already have real coordinates.
+   */
+  placeId?: string | null;
 }
 
 /**

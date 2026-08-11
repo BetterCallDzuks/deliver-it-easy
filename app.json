@@ -39,7 +39,15 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": ["expo-sqlite"],
+    "plugins": [
+      "expo-sqlite",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Deliver It Easy uses your location to set your delivery route's starting point."
+        }
+      ]
+    ],
     "extra": {
       "mockMode": true,
       "googlePlacesApiKey": "",

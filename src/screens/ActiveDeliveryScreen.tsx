@@ -22,7 +22,7 @@ type Props = NativeStackScreenProps<PlannerStackParamList, 'ActiveDelivery'>;
  * updates the map, promotes the next one).
  */
 export function ActiveDeliveryScreen({ navigation }: Props) {
-  const { pendingStops, route, markDelivered } = useRoute();
+  const { pendingStops, route, origin, markDelivered } = useRoute();
 
   const current = pendingStops[0];
   const next = pendingStops[1];
@@ -62,6 +62,7 @@ export function ActiveDeliveryScreen({ navigation }: Props) {
           stops={pendingStops}
           polyline={route?.polyline}
           activeStopId={current.id}
+          origin={origin}
         />
       </View>
 
