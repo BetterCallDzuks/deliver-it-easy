@@ -29,6 +29,40 @@ npm start          # then press i (iOS), a (Android), or scan the QR in Expo Go
 > Native Google Maps needs a Dev Build (or Expo Go) — `react-native-maps`
 > renders via Apple Maps on iOS by default and Google Maps on Android.
 
+## Install on a phone
+
+**Quick look (Expo Go, mock mode, no keys):** run `npx expo start` and scan the
+QR with the Expo Go app. Every library here is supported in Expo Go, so the
+whole app runs in mock mode. (Expo Go ignores custom native config / your own
+Maps key — use an EAS build below for that.)
+
+**Real installable app (EAS Build):** build profiles are defined in `eas.json`.
+
+```bash
+npm install -g eas-cli
+eas login                 # free Expo account
+eas init                  # links the project (writes extra.eas.projectId), first time only
+
+# Android — installable APK you can sideload right now:
+eas build --profile preview --platform android
+
+# Development build (dev client, for testing with your own native config/keys):
+eas build --profile development --platform android   # or ios
+npx expo start --dev-client
+
+# Store builds:
+eas build --profile production --platform android    # AAB for Play Store
+eas build --profile production --platform ios        # needs an Apple Developer account; installs via TestFlight
+```
+
+Profiles:
+- **development** — dev client (`developmentClient: true`), internal distribution.
+- **preview** — internal distribution; Android emits an **APK** for easy sideloading.
+- **production** — Android **AAB** with auto-incremented version; iOS for TestFlight/App Store.
+
+> iOS can't be sideloaded — it requires a paid Apple Developer account and goes
+> through TestFlight. Android `preview` needs neither.
+
 ## Development & CI
 
 ```bash
