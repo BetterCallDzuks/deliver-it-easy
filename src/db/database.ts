@@ -64,6 +64,22 @@ async function initialise(): Promise<SQLite.SQLiteDatabase> {
 
     CREATE INDEX IF NOT EXISTS idx_template_stops_template
       ON route_template_stops (template_id, position);
+
+    CREATE TABLE IF NOT EXISTS delivery_proofs (
+      id                TEXT PRIMARY KEY NOT NULL,
+      stop_label        TEXT,
+      formatted_address TEXT NOT NULL,
+      latitude          REAL NOT NULL,
+      longitude         REAL NOT NULL,
+      recipient_name    TEXT,
+      notes             TEXT,
+      photo_uri         TEXT,
+      signature_svg     TEXT,
+      delivered_at      INTEGER NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_delivery_proofs_time
+      ON delivery_proofs (delivered_at DESC);
   `);
 
   // Enforce the cascade delete declared above.

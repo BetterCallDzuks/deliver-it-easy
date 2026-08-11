@@ -122,6 +122,31 @@ export interface TemplateStop {
   notes: string | null;
 }
 
+/**
+ * A proof-of-delivery record captured when a stop is marked delivered.
+ *
+ * Persisted locally (SQLite) so it survives offline and forms a delivery
+ * history. Photo is stored as a durable file URI in the app's document dir;
+ * the signature is stored as serialized SVG path data.
+ */
+export interface DeliveryProof {
+  id: string;
+  /** The stop this proof belongs to (denormalized snapshot). */
+  stopLabel: string | null;
+  formattedAddress: string;
+  latitude: number;
+  longitude: number;
+  /** Who received it, if captured. */
+  recipientName: string | null;
+  notes: string | null;
+  /** Durable local file URI of the delivery photo, if taken. */
+  photoUri: string | null;
+  /** Serialized signature strokes (SVG path `d` strings), if signed. */
+  signatureSvg: string | null;
+  /** Epoch millis when marked delivered. */
+  deliveredAt: number;
+}
+
 /** A leg of a computed route (distance/time between two consecutive stops). */
 export interface RouteLeg {
   from: Coordinate;

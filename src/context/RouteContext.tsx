@@ -2,6 +2,7 @@ import React, {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -16,10 +17,18 @@ import type {
   RouteTemplate,
   Stop,
 } from '@/models/types';
-import { getCurrentLocation } from '@/services/deviceLocationService';
+import {
+  getCurrentLocation,
+  type LocationSubscription,
+  watchLocation,
+} from '@/services/deviceLocationService';
 import { saveSuggestionToAddressBook } from '@/services/locationService';
 import { buildRoute, optimizeRoute } from '@/services/routingService';
+import { haversineMeters } from '@/utils/geo';
 import { createId } from '@/utils/id';
+
+/** Re-anchor the route when the driver has moved at least this far (metres). */
+const LIVE_REANCHOR_METERS = 75;
 
 /**
  * RouteContext holds the ONE route the driver is currently planning / driving,
@@ -41,6 +50,10 @@ interface RouteContextValue {
   origin: DriverLocation | null;
   /** True while fetching the device location. */
   isLocating: boolean;
+  /** The driver's live position while tracking (Active Delivery), else null. */
+  liveLocation: DriverLocation | null;
+  /** True while live position tracking is active. */
+  isTracking: boolean;
 
   addStopFromSuggestion: (s: AddressSuggestion) => Promise<void>;
   addStopFromAddress: (a: Address) => Promise<void>;
@@ -54,6 +67,8 @@ interface RouteContextValue {
   clearRouteError: () => void;
   setStartToCurrentLocation: () => Promise<void>;
   clearOrigin: () => void;
+  startLiveTracking: () => Promise<void>;
+  stopLiveTracking: () => void;
 
   pendingStops: Stop[];
 }
@@ -108,6 +123,8 @@ export function RouteProvider({ children }: { children: React.ReactNode }) {
   const [routeError, setRouteError] = useState<string | null>(null);
   const [origin, setOriginState] = useState<DriverLocation | null>(null);
   const [isLocating, setIsLocating] = useState(false);
+  const [liveLocation, setLiveLocation] = useState<DriverLocation | null>(null);
+  const [isTracking, setIsTracking] = useState(false);
 
   // A ref mirrors `origin` so refreshRoute (which many callbacks invoke without
   // re-creating) always reads the latest value without a stale closure.
@@ -116,6 +133,16 @@ export function RouteProvider({ children }: { children: React.ReactNode }) {
     originRef.current = next;
     setOriginState(next);
   }, []);
+
+  // Latest stops, readable from the live-tracking callback without stale state.
+  const stopsRef = useRef<Stop[]>([]);
+  useEffect(() => {
+    stopsRef.current = stops;
+  }, [stops]);
+
+  // Live-tracking subscription + the position we last re-routed from.
+  const subscriptionRef = useRef<LocationSubscription | null>(null);
+  const lastRoutedLiveRef = useRef<DriverLocation | null>(null);
 
   const clearRouteError = useCallback(() => setRouteError(null), []);
 
@@ -244,6 +271,46 @@ export function RouteProvider({ children }: { children: React.ReactNode }) {
     void refreshRoute(stops);
   }, [stops, refreshRoute, setOrigin]);
 
+  /**
+   * Begin live position tracking (Active Delivery). Each fix updates the live
+   * marker; when the driver has moved far enough we re-anchor the route origin
+   * to the new position and recompute — so the leg to the current stop and the
+   * ETA stay honest as they drive, without hammering the routing API on every
+   * GPS tick.
+   */
+  const startLiveTracking = useCallback(async () => {
+    if (subscriptionRef.current) return; // already tracking
+    try {
+      const subscription = await watchLocation((location) => {
+        setLiveLocation(location);
+        const last = lastRoutedLiveRef.current;
+        const movedEnough =
+          !last || haversineMeters(last, location) > LIVE_REANCHOR_METERS;
+        if (movedEnough) {
+          lastRoutedLiveRef.current = location;
+          setOrigin(location);
+          void refreshRoute(stopsRef.current);
+        }
+      });
+      subscriptionRef.current = subscription;
+      setIsTracking(true);
+    } catch (err) {
+      setRouteError(errorMessage(err));
+    }
+  }, [refreshRoute, setOrigin]);
+
+  /** Stop live tracking and release the location subscription. */
+  const stopLiveTracking = useCallback(() => {
+    subscriptionRef.current?.remove();
+    subscriptionRef.current = null;
+    lastRoutedLiveRef.current = null;
+    setLiveLocation(null);
+    setIsTracking(false);
+  }, []);
+
+  // Always release the subscription if the provider unmounts.
+  useEffect(() => () => subscriptionRef.current?.remove(), []);
+
   const markDelivered = useCallback(
     (stopId: string) => {
       setStops((prev) => {
@@ -290,6 +357,8 @@ export function RouteProvider({ children }: { children: React.ReactNode }) {
       routeError,
       origin,
       isLocating,
+      liveLocation,
+      isTracking,
       addStopFromSuggestion,
       addStopFromAddress,
       removeStop,
@@ -301,6 +370,8 @@ export function RouteProvider({ children }: { children: React.ReactNode }) {
       clearRouteError,
       setStartToCurrentLocation,
       clearOrigin,
+      startLiveTracking,
+      stopLiveTracking,
       pendingStops,
     }),
     [
@@ -310,6 +381,8 @@ export function RouteProvider({ children }: { children: React.ReactNode }) {
       routeError,
       origin,
       isLocating,
+      liveLocation,
+      isTracking,
       addStopFromSuggestion,
       addStopFromAddress,
       removeStop,
@@ -321,6 +394,8 @@ export function RouteProvider({ children }: { children: React.ReactNode }) {
       clearRouteError,
       setStartToCurrentLocation,
       clearOrigin,
+      startLiveTracking,
+      stopLiveTracking,
       pendingStops,
     ],
   );

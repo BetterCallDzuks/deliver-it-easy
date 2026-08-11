@@ -5,6 +5,7 @@ import React from 'react';
 
 import { ActiveDeliveryScreen } from '@/screens/ActiveDeliveryScreen';
 import { AddressBookScreen } from '@/screens/AddressBookScreen';
+import { DeliveryHistoryScreen } from '@/screens/DeliveryHistoryScreen';
 import { RoutePlannerScreen } from '@/screens/RoutePlannerScreen';
 import { TemplatesScreen } from '@/screens/TemplatesScreen';
 import { colors } from '@/theme/colors';
@@ -46,13 +47,19 @@ export function RootNavigator() {
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textSecondary,
         tabBarIcon: ({ color, size }) => {
-          const icon: keyof typeof Ionicons.glyphMap =
-            route.name === 'PlanTab'
-              ? 'map'
-              : route.name === 'AddressBookTab'
-                ? 'bookmarks'
-                : 'repeat';
-          return <Ionicons name={icon} size={size} color={color} />;
+          const icons: Record<keyof RootTabParamList, keyof typeof Ionicons.glyphMap> = {
+            PlanTab: 'map',
+            AddressBookTab: 'bookmarks',
+            TemplatesTab: 'repeat',
+            HistoryTab: 'receipt',
+          };
+          return (
+            <Ionicons
+              name={icons[route.name as keyof RootTabParamList]}
+              size={size}
+              color={color}
+            />
+          );
         },
       })}
     >
@@ -70,6 +77,11 @@ export function RootNavigator() {
         name="TemplatesTab"
         component={TemplatesScreen}
         options={{ title: 'Templates' }}
+      />
+      <Tab.Screen
+        name="HistoryTab"
+        component={DeliveryHistoryScreen}
+        options={{ title: 'History' }}
       />
     </Tab.Navigator>
   );

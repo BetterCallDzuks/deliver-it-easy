@@ -1,12 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import {
+  type DeliveryProofDraft,
+  ProofOfDeliveryModal,
+} from '@/components/ProofOfDeliveryModal';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { RouteMap } from '@/components/RouteMap';
 import { useRoute } from '@/context/RouteContext';
+import { saveDeliveryProof } from '@/db/deliveryRepository';
 import type { PlannerStackParamList } from '@/navigation/types';
 import { promptNavigation } from '@/services/navigationService';
 import { colors, radius, spacing } from '@/theme/colors';
@@ -18,14 +23,34 @@ type Props = NativeStackScreenProps<PlannerStackParamList, 'ActiveDelivery'>;
  *
  * Deliberately big and low-clutter: the driver sees the CURRENT stop, a glance
  * at what's NEXT, one huge Navigate button (hands the exact lat/lng to Google /
- * Waze / Apple Maps) and one huge Mark-as-Delivered button (drops the stop,
- * updates the map, promotes the next one).
+ * Waze / Apple Maps) and one huge Mark-as-Delivered button (opens proof of
+ * delivery, then drops the stop and promotes the next one).
+ *
+ * Live tracking runs while this screen is mounted: the driver's moving position
+ * updates the map and periodically re-anchors the route so the ETA stays honest.
  */
 export function ActiveDeliveryScreen({ navigation }: Props) {
-  const { pendingStops, route, origin, markDelivered } = useRoute();
+  const {
+    pendingStops,
+    route,
+    origin,
+    liveLocation,
+    isTracking,
+    markDelivered,
+    startLiveTracking,
+    stopLiveTracking,
+  } = useRoute();
+
+  const [podVisible, setPodVisible] = useState(false);
 
   const current = pendingStops[0];
   const next = pendingStops[1];
+
+  // Track the driver's live position for the duration of the delivery run.
+  useEffect(() => {
+    void startLiveTracking();
+    return () => stopLiveTracking();
+  }, [startLiveTracking, stopLiveTracking]);
 
   const handleNavigate = useCallback(() => {
     if (current) promptNavigation(current);
@@ -33,8 +58,34 @@ export function ActiveDeliveryScreen({ navigation }: Props) {
 
   const handleDelivered = useCallback(() => {
     if (!current) return;
-    markDelivered(current.id);
-  }, [current, markDelivered]);
+    setPodVisible(true);
+  }, [current]);
+
+  const handleConfirmProof = useCallback(
+    async (draft: DeliveryProofDraft) => {
+      if (!current) return;
+      setPodVisible(false);
+      // Record where the delivery was actually completed (live fix if we have
+      // one, else the stop's own coordinates).
+      const at = liveLocation ?? current;
+      try {
+        await saveDeliveryProof({
+          stopLabel: current.label,
+          formattedAddress: current.formattedAddress,
+          latitude: at.latitude,
+          longitude: at.longitude,
+          recipientName: draft.recipientName,
+          notes: draft.notes,
+          photoUri: draft.photoUri,
+          signatureSvg: draft.signatureSvg,
+        });
+      } finally {
+        // Advance the route even if persistence hiccups — never trap the driver.
+        markDelivered(current.id);
+      }
+    },
+    [current, liveLocation, markDelivered],
+  );
 
   // All stops delivered — celebrate and let them head back.
   if (!current) {
@@ -62,7 +113,7 @@ export function ActiveDeliveryScreen({ navigation }: Props) {
           stops={pendingStops}
           polyline={route?.polyline}
           activeStopId={current.id}
-          origin={origin}
+          origin={liveLocation ?? origin}
         />
       </View>
 
@@ -71,10 +122,18 @@ export function ActiveDeliveryScreen({ navigation }: Props) {
         contentContainerStyle={styles.panelContent}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.remainingPill}>
-          <Text style={styles.remainingText}>
-            {pendingStops.length} stop{pendingStops.length === 1 ? '' : 's'} remaining
-          </Text>
+        <View style={styles.pillRow}>
+          <View style={styles.remainingPill}>
+            <Text style={styles.remainingText}>
+              {pendingStops.length} stop{pendingStops.length === 1 ? '' : 's'} remaining
+            </Text>
+          </View>
+          {isTracking && (
+            <View style={styles.livePill}>
+              <View style={styles.liveDot} />
+              <Text style={styles.liveText}>Live</Text>
+            </View>
+          )}
         </View>
 
         {/* Current destination */}
@@ -125,6 +184,13 @@ export function ActiveDeliveryScreen({ navigation }: Props) {
           style={styles.bigButton}
         />
       </ScrollView>
+
+      <ProofOfDeliveryModal
+        visible={podVisible}
+        stop={current}
+        onCancel={() => setPodVisible(false)}
+        onConfirm={handleConfirmProof}
+      />
     </SafeAreaView>
   );
 }
@@ -144,6 +210,32 @@ const styles = StyleSheet.create({
   panelContent: {
     padding: spacing.lg,
     gap: spacing.sm,
+  },
+  pillRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+  },
+  livePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.danger,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  liveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.surface,
+  },
+  liveText: {
+    color: colors.surface,
+    fontWeight: '800',
+    fontSize: 12,
   },
   remainingPill: {
     alignSelf: 'center',

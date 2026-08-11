@@ -63,4 +63,66 @@ export async function getCurrentLocation(): Promise<DriverLocation> {
   }
 }
 
+/** A live-location subscription; call remove() to stop watching. */
+export interface LocationSubscription {
+  remove: () => void;
+}
+
+/**
+ * Continuously watch the driver's position (for Active Delivery live tracking).
+ * Calls onUpdate with each new fix. Remember to remove() the subscription when
+ * leaving the screen.
+ *
+ * MOCK: emits a position that gently drifts every couple of seconds so the live
+ * marker visibly moves in a simulator with no real GPS.
+ * REAL: expo-location watchPositionAsync (foreground permission required).
+ */
+export async function watchLocation(
+  onUpdate: (location: DriverLocation) => void,
+): Promise<LocationSubscription> {
+  if (CONFIG.MOCK_MODE) {
+    return mockWatch(onUpdate);
+  }
+
+  const { status } = await Location.requestForegroundPermissionsAsync();
+  if (status !== Location.PermissionStatus.GRANTED) {
+    throw new LocationUnavailableError(
+      'Location permission is off. Enable it to track your position live.',
+    );
+  }
+
+  const subscription = await Location.watchPositionAsync(
+    {
+      accuracy: Location.Accuracy.Balanced,
+      distanceInterval: 20, // metres between updates
+      timeInterval: 4000, // ms between updates
+    },
+    (position) =>
+      onUpdate({
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        label: 'My location',
+      }),
+  );
+
+  return { remove: () => subscription.remove() };
+}
+
+/** Simulated live movement for MOCK_MODE demos. */
+function mockWatch(
+  onUpdate: (location: DriverLocation) => void,
+): LocationSubscription {
+  let { latitude, longitude } = MOCK_LOCATION;
+  onUpdate({ latitude, longitude, label: MOCK_LOCATION.label });
+
+  const timer = setInterval(() => {
+    // Small biased drift so the marker meanders around central Manchester.
+    latitude += (Math.random() - 0.4) * 0.0009;
+    longitude += (Math.random() - 0.4) * 0.0009;
+    onUpdate({ latitude, longitude, label: MOCK_LOCATION.label });
+  }, 2500);
+
+  return { remove: () => clearInterval(timer) };
+}
+
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
